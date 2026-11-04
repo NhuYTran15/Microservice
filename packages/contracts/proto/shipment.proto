@@ -1,0 +1,22 @@
+syntax = "proto3";
+package ecommerce;
+import "common.proto";
+
+service ShipmentService {
+  rpc GetShipment(GetShipmentRequest) returns (ShipmentResponse);
+  rpc GetShipmentByOrder(GetShipmentByOrderRequest) returns (ShipmentResponse);
+  rpc UpdateStatus(UpdateShipmentStatusRequest) returns (ShipmentResponse);
+  rpc Health(Empty) returns (HealthResponse);
+}
+
+message GetShipmentRequest { int32 shipid = 1; int32 uid = 2; string role = 3; }
+message GetShipmentByOrderRequest { int32 oid = 1; int32 uid = 2; string role = 3; }
+message UpdateShipmentStatusRequest { int32 shipid = 1; string status = 2; }
+message ShipmentResponse {
+  int32 shipid = 1;
+  int32 oid = 2;
+  int32 uid = 3;
+  string status = 4;
+  string created_at = 5;
+  string updated_at = 6;
+}

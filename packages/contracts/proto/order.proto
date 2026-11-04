@@ -1,0 +1,30 @@
+syntax = "proto3";
+package ecommerce;
+import "common.proto";
+import "product.proto";
+
+service OrderService {
+  rpc CreateOrder(CreateOrderRequest) returns (OrderResponse);
+  rpc ListOrders(OrderActorRequest) returns (OrderListResponse);
+  rpc GetOrder(GetOrderRequest) returns (OrderResponse);
+  rpc Health(Empty) returns (HealthResponse);
+}
+
+message CreateOrderRequest { int32 uid = 1; string role = 2; repeated InventoryItem items = 3; }
+message OrderActorRequest { int32 uid = 1; string role = 2; }
+message GetOrderRequest { int32 oid = 1; int32 uid = 2; string role = 3; }
+message OrderItemResponse { int32 pid = 1; string pname = 2; int32 qty = 3; double unit_price = 4; }
+message OrderResponse {
+  int32 oid = 1;
+  int32 uid = 2;
+  double discount = 3;
+  double subtotal = 4;
+  double total_amount = 5;
+  string status = 6;
+  string shipment_status = 7;
+  string created_at = 8;
+  repeated OrderItemResponse items = 9;
+  string shipment_lookup = 10;
+}
+message OrderListResponse { repeated OrderResponse items = 1; }
+

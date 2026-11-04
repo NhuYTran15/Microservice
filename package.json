@@ -1,0 +1,27 @@
+{
+  "name": "ecommerce-microservices-mvp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start:gateway": "npm start --workspace @ecommerce/api-gateway",
+    "start:auth": "npm start --workspace @ecommerce/auth-service",
+    "start:customer": "npm start --workspace @ecommerce/customer-service",
+    "start:product": "npm start --workspace @ecommerce/product-service",
+    "start:order": "npm start --workspace @ecommerce/order-service",
+    "start:shipment": "npm start --workspace @ecommerce/shipment-service",
+    "test": "node --test",
+    "check": "node --check apps/api-gateway/src/index.js && node --check apps/auth-service/src/index.js && node --check apps/customer-service/src/index.js && node --check apps/product-service/src/index.js && node --check apps/order-service/src/index.js && node --check apps/shipment-service/src/index.js",
+    "compose:up": "docker compose up --build -d",
+    "compose:down": "docker compose down",
+    "compose:logs": "docker compose logs -f"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
+

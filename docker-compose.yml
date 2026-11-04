@@ -1,0 +1,231 @@
+name: ecommerce-mvp
+
+x-app-defaults: &app-defaults
+  restart: on-failure
+  environment: &common-environment
+    JWT_SECRET: ${JWT_SECRET:-local-dev-only-change-this-jwt-secret-12345}
+    JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+    AUTH_GRPC_ADDRESS: ${AUTH_GRPC_ADDRESS:-auth-service:50051}
+    CUSTOMER_GRPC_ADDRESS: ${CUSTOMER_GRPC_ADDRESS:-customer-service:50052}
+    PRODUCT_GRPC_ADDRESS: ${PRODUCT_GRPC_ADDRESS:-product-service:50053}
+    ORDER_GRPC_ADDRESS: ${ORDER_GRPC_ADDRESS:-order-service:50054}
+    SHIPMENT_GRPC_ADDRESS: ${SHIPMENT_GRPC_ADDRESS:-shipment-service:50055}
+    KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+
+x-grpc-healthcheck: &grpc-healthcheck
+  test: ["CMD", "node", "-e", "const n=require('net').connect(process.env.GRPC_PORT,'127.0.0.1',()=>{n.end();process.exit(0)});n.on('error',()=>process.exit(1))"]
+  interval: 5s
+  timeout: 2s
+  retries: 20
+  start_period: 5s
+
+services:
+  auth-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_pass
+    volumes:
+      - auth-data:/var/lib/postgresql/data
+      - ./infra/sql/auth-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports: ["5433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  customer-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: customer_user
+      POSTGRES_PASSWORD: customer_pass
+    volumes:
+      - customer-data:/var/lib/postgresql/data
+      - ./infra/sql/customer-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports: ["5434:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  order-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: order_user
+      POSTGRES_PASSWORD: order_pass
+    volumes:
+      - order-data:/var/lib/postgresql/data
+      - ./infra/sql/order-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports: ["5435:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_user -d order_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  product-db:
+    image: mongo:7
+    volumes: ["product-data:/data/db"]
+    ports: ["27018:27017"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  shipment-db:
+    image: mongo:7
+    volumes: ["shipment-data:/data/db"]
+    ports: ["27019:27017"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes: ["redis-data:/data"]
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:3.9.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports: ["9092:9092"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  customer-service:
+    <<: *app-defaults
+    build:
+      context: .
+      args: { SERVICE_NAME: customer-service }
+    environment:
+      <<: *common-environment
+      GRPC_PORT: 50052
+      CUSTOMER_DATABASE_URL: ${CUSTOMER_DATABASE_URL:-postgres://customer_user:customer_pass@customer-db:5432/customer_db}
+    depends_on:
+      customer-db: { condition: service_healthy }
+    healthcheck: *grpc-healthcheck
+
+  auth-service:
+    <<: *app-defaults
+    build:
+      context: .
+      args: { SERVICE_NAME: auth-service }
+    environment:
+      <<: *common-environment
+      GRPC_PORT: 50051
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:-postgres://auth_user:auth_pass@auth-db:5432/auth_db}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin@123}
+    depends_on:
+      auth-db: { condition: service_healthy }
+      customer-service: { condition: service_healthy }
+    healthcheck: *grpc-healthcheck
+
+  product-service:
+    <<: *app-defaults
+    build:
+      context: .
+      args: { SERVICE_NAME: product-service }
+    environment:
+      <<: *common-environment
+      GRPC_PORT: 50053
+      PRODUCT_MONGODB_URL: ${PRODUCT_MONGODB_URL:-mongodb://product-db:27017/product_db}
+    depends_on:
+      product-db: { condition: service_healthy }
+    healthcheck: *grpc-healthcheck
+
+  order-service:
+    <<: *app-defaults
+    build:
+      context: .
+      args: { SERVICE_NAME: order-service }
+    environment:
+      <<: *common-environment
+      GRPC_PORT: 50054
+      ORDER_DATABASE_URL: ${ORDER_DATABASE_URL:-postgres://order_user:order_pass@order-db:5432/order_db}
+    depends_on:
+      order-db: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      customer-service: { condition: service_healthy }
+      product-service: { condition: service_healthy }
+    healthcheck: *grpc-healthcheck
+
+  shipment-service:
+    <<: *app-defaults
+    build:
+      context: .
+      args: { SERVICE_NAME: shipment-service }
+    environment:
+      <<: *common-environment
+      GRPC_PORT: 50055
+      SHIPMENT_MONGODB_URL: ${SHIPMENT_MONGODB_URL:-mongodb://shipment-db:27017/shipment_db}
+    depends_on:
+      shipment-db: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    healthcheck: *grpc-healthcheck
+
+  api-gateway:
+    <<: *app-defaults
+    build:
+      context: .
+      args: { SERVICE_NAME: api-gateway }
+    environment:
+      <<: *common-environment
+      GATEWAY_PORT: ${GATEWAY_PORT:-3000}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-30}
+    ports: ["${GATEWAY_HOST_PORT:-3100}:3000"]
+    depends_on:
+      redis: { condition: service_healthy }
+      auth-service: { condition: service_healthy }
+      customer-service: { condition: service_healthy }
+      product-service: { condition: service_healthy }
+      order-service: { condition: service_healthy }
+      shipment-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "const n=require('net').connect(process.env.GATEWAY_PORT,'127.0.0.1',()=>{n.end();process.exit(0)});n.on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  auth-data:
+  customer-data:
+  order-data:
+  product-data:
+  shipment-data:
+  redis-data:
+

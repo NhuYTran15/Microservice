@@ -1,0 +1,12 @@
+{
+  "name": "@ecommerce/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": "./src/index.js",
+  "dependencies": {
+    "@grpc/grpc-js": "*",
+    "@grpc/proto-loader": "*",
+    "pino": "*"
+  }
+}
+

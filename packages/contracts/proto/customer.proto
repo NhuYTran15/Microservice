@@ -1,0 +1,40 @@
+syntax = "proto3";
+package ecommerce;
+import "common.proto";
+
+service CustomerService {
+  rpc CreateCustomer(CreateCustomerRequest) returns (CustomerResponse);
+  rpc DeleteCustomer(CustomerIdRequest) returns (OperationResponse);
+  rpc GetCustomer(CustomerIdRequest) returns (CustomerResponse);
+  rpc UpdateCustomer(UpdateCustomerRequest) returns (CustomerResponse);
+  rpc GetMembership(CustomerIdRequest) returns (MembershipResponse);
+  rpc Health(Empty) returns (HealthResponse);
+}
+
+message CustomerIdRequest { int32 uid = 1; }
+message CreateCustomerRequest {
+  int32 uid = 1;
+  string fullname = 2;
+  string email = 3;
+  string phone = 4;
+}
+message UpdateCustomerRequest {
+  int32 uid = 1;
+  string actor_role = 2;
+  string fullname = 3;
+  string email = 4;
+  string phone = 5;
+  int32 mid = 6;
+  bool has_mid = 7;
+}
+message CustomerResponse {
+  int32 uid = 1;
+  string fullname = 2;
+  string email = 3;
+  string phone = 4;
+  int32 mid = 5;
+  string membership_name = 6;
+  int32 score = 7;
+}
+message MembershipResponse { int32 mid = 1; string name = 2; int32 score = 3; }
+

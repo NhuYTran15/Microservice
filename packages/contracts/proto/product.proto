@@ -1,0 +1,27 @@
+syntax = "proto3";
+package ecommerce;
+import "common.proto";
+
+service ProductService {
+  rpc ListProducts(ListProductsRequest) returns (ProductListResponse);
+  rpc GetProduct(ProductIdRequest) returns (ProductResponse);
+  rpc CreateProduct(ProductInput) returns (ProductResponse);
+  rpc UpdateProduct(UpdateProductRequest) returns (ProductResponse);
+  rpc DeleteProduct(ProductIdRequest) returns (OperationResponse);
+  rpc ReserveInventory(ReserveInventoryRequest) returns (ReservationResponse);
+  rpc ReleaseInventory(ReleaseInventoryRequest) returns (OperationResponse);
+  rpc Health(Empty) returns (HealthResponse);
+}
+
+message ProductIdRequest { int32 pid = 1; }
+message ListProductsRequest { int32 page = 1; int32 limit = 2; }
+message ProductInput { string pname = 1; double price = 2; int32 quantity = 3; }
+message UpdateProductRequest { int32 pid = 1; string pname = 2; double price = 3; int32 quantity = 4; }
+message ProductResponse { int32 pid = 1; string pname = 2; double price = 3; int32 quantity = 4; }
+message ProductListResponse { repeated ProductResponse items = 1; int32 total = 2; int32 page = 3; int32 limit = 4; }
+message InventoryItem { int32 pid = 1; int32 qty = 2; }
+message ReserveInventoryRequest { string reservation_id = 1; repeated InventoryItem items = 2; }
+message ReservedItem { int32 pid = 1; int32 qty = 2; string pname = 3; double unit_price = 4; }
+message ReservationResponse { string reservation_id = 1; repeated ReservedItem items = 2; }
+message ReleaseInventoryRequest { string reservation_id = 1; }
+

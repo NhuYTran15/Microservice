@@ -1,0 +1,13 @@
+syntax = "proto3";
+package ecommerce;
+
+message Empty {}
+message HealthResponse {
+  string status = 1;
+  string service = 2;
+}
+message OperationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
